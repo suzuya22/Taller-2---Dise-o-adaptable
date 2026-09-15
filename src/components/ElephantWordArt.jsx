@@ -1,10 +1,44 @@
 import { useState, useMemo } from 'react';
 import { INITIAL_ELEPHANT_WORDS, SUGGESTED_TAGS } from '../data/daliData';
 
+// Silueta del "elefante espacial" daliniano (cuerpo, cabeza, trompa alzada,
+// orejas, colmillo, obelisco sobre el lomo y 4 patas zancudas larguísimas).
+// Se define una única vez como shapes SVG reutilizables tanto para la
+// máscara de texto (rellenas de blanco) como para el contorno decorativo.
+const ELEPHANT_VIEWBOX = '0 0 620 760';
+
+const ELEPHANT_SHAPES_FILL = `
+  <rect x="365" y="50" width="32" height="95" fill="#fff"/>
+  <polygon points="381,8 358,50 404,50" fill="#fff"/>
+  <ellipse cx="380" cy="260" rx="140" ry="85" fill="#fff"/>
+  <path d="M230,150 C300,128 322,212 280,262 C250,292 208,272 200,232 C195,192 200,162 230,150 Z" fill="#fff"/>
+  <circle cx="190" cy="230" r="70" fill="#fff"/>
+  <path d="M120,235 Q80,285 63,335 Q52,368 78,382" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round"/>
+  <path d="M140,278 Q118,302 92,296" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+  <path d="M515,245 Q545,265 535,300" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+  <path d="M270,340 L255,460 L268,460 L250,600 L266,600 L255,730" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M310,340 L322,465 L308,465 L326,605 L310,605 L322,730" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M430,340 L415,465 L428,465 L412,605 L426,605 L415,730" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M470,340 L485,460 L470,460 L488,600 L472,600 L485,730" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <ellipse cx="255" cy="732" rx="15" ry="7" fill="#fff"/>
+  <ellipse cx="322" cy="732" rx="15" ry="7" fill="#fff"/>
+  <ellipse cx="415" cy="732" rx="15" ry="7" fill="#fff"/>
+  <ellipse cx="485" cy="732" rx="15" ry="7" fill="#fff"/>
+`;
+
+// Máscara CSS: incrustada como data-URI para que funcione de forma
+// autocontenida (sin depender de referenciar un <mask> vivo del DOM).
+const ELEPHANT_MASK_URI = `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${ELEPHANT_VIEWBOX}">${ELEPHANT_SHAPES_FILL}</svg>`
+)}`;
+
+// Cuántas "casillas" de palabra se necesitan para cubrir por completo la
+// silueta (cuerpo ancho + patas larguísimas y delgadas) sin dejar huecos.
+const WORD_TILE_COUNT = 640;
+
 export default function ElephantWordArt() {
   const [words, setWords] = useState(INITIAL_ELEPHANT_WORDS);
   const [inputWord, setInputWord] = useState('');
-  const [hoveredPart, setHoveredPart] = useState(null);
   const [visualMode, setVisualMode] = useState('calligram'); // 'calligram' | 'silhouette'
 
   // Añadir una nueva palabra ingresada por el usuario
@@ -45,42 +79,12 @@ export default function ElephantWordArt() {
     setWords(INITIAL_ELEPHANT_WORDS);
   };
 
-  // Distribuir las palabras en las diferentes regiones anatómicas del elefante
-  const distributedParts = useMemo(() => {
-    const list = [...words];
-    // Asegurar que siempre haya suficientes palabras repitiendo cíclicamente si es necesario
-    const getWord = (index) => list[index % list.length];
-
-    return {
-      // 1. Cúspide del obelisco (ápice y pirámide superior)
-      obeliskApex: getWord(0),
-      obeliskMid: [getWord(1), getWord(2)],
-      obeliskBase: [getWord(3), getWord(4), getWord(5)],
-      
-      // 2. Manta ceremonial y montura
-      saddle: [getWord(6), getWord(7)],
-
-      // 3. Cabeza, colmillos y trompa alzada
-      trunkTip: getWord(8),
-      trunkMid: getWord(9),
-      head: [getWord(10), getWord(11)],
-      tusks: getWord(12),
-      ears: [getWord(13), getWord(14)],
-
-      // 4. Lomo y masa corporal
-      torsoUpper: [getWord(15), getWord(16), getWord(17)],
-      torsoLower: [getWord(18), getWord(19), getWord(20)],
-
-      // 5. Las cuatro patas zancudas imposibles (hiper-alargadas)
-      // Pata delantera 1 (frontal extendida)
-      legFront1: [getWord(21), getWord(22), getWord(23), getWord(24), getWord(25)],
-      // Pata delantera 2 (frontal interior)
-      legFront2: [getWord(26), getWord(27), getWord(28), getWord(29), getWord(30)],
-      // Pata trasera 1 (trasera interior)
-      legBack1: [getWord(31), getWord(32), getWord(33), getWord(34), getWord(35)],
-      // Pata trasera 2 (trasera extendida)
-      legBack2: [getWord(36), getWord(37), getWord(38), getWord(39), getWord(40)]
-    };
+  // Rellenar densamente la silueta repitiendo cíclicamente las palabras activas,
+  // de modo que el cuerpo, la trompa, las orejas y las patas larguísimas queden
+  // cubiertas de texto de punta a punta (como un caligrama real, no una lista de cajas).
+  const tiledWords = useMemo(() => {
+    if (words.length === 0) return [];
+    return Array.from({ length: WORD_TILE_COUNT }, (_, i) => words[i % words.length]);
   }, [words]);
 
   return (
@@ -190,232 +194,68 @@ export default function ElephantWordArt() {
         {/* Fondo atmosférico de "Los Elefantes" (crepúsculo rojo y horizonte desértico) */}
         <div className="absolute inset-0 pointer-events-none opacity-25 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-600/30 via-red-900/15 to-transparent"></div>
 
-        {/* Silueta vectorial de fondo en modo ilustración */}
-        {visualMode === 'silhouette' && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-            <svg viewBox="0 0 600 800" className="w-full h-full max-h-[750px] stroke-amber-400 fill-amber-500/10" strokeWidth="1.5">
-              {/* Obelisco */}
-              <polygon points="300,40 280,240 320,240" />
-              {/* Cuerpo del elefante */}
-              <ellipse cx="300" cy="300" rx="90" ry="55" />
-              {/* Cabeza y oreja */}
-              <circle cx="210" cy="290" r="45" />
-              {/* Trompa alzada */}
-              <path d="M 185,310 Q 140,320 135,270 T 150,220" fill="none" strokeWidth="6" />
-              {/* Colmillos */}
-              <path d="M 180,315 Q 160,340 130,335" fill="none" strokeWidth="3" />
-              {/* 4 Patas zancudas infinitas */}
-              <line x1="240" y1="350" x2="210" y2="780" strokeWidth="2.5" />
-              <line x1="265" y1="350" x2="250" y2="780" strokeWidth="2" />
-              <line x1="335" y1="350" x2="350" y2="780" strokeWidth="2" />
-              <line x1="365" y1="350" x2="390" y2="780" strokeWidth="2.5" />
-              {/* Nodos articulares de las patas (estilo insecto daliniano) */}
-              <circle cx="225" cy="565" r="4" />
-              <circle cx="257" cy="565" r="3.5" />
-              <circle cx="342" cy="565" r="3.5" />
-              <circle cx="377" cy="565" r="4" />
+        {/* EL ELEFANTE COMPUESTO ÍNTEGRAMENTE DE PALABRAS (máscara de silueta real) */}
+        <div className="relative z-10 mx-auto" style={{ maxWidth: 560, aspectRatio: '620 / 760' }}>
+          {/* Capa de texto: se repiten las palabras activas hasta cubrir toda la silueta,
+              y una máscara CSS con la forma del elefante recorta lo que sobra. */}
+          <div
+            className="absolute inset-0 flex flex-wrap content-start justify-center gap-x-1 gap-y-[3px] overflow-hidden px-1 py-1 select-none"
+            style={{
+              WebkitMaskImage: `url("${ELEPHANT_MASK_URI}")`,
+              maskImage: `url("${ELEPHANT_MASK_URI}")`,
+              WebkitMaskSize: '100% 100%',
+              maskSize: '100% 100%',
+              WebkitMaskRepeat: 'no-repeat',
+              maskRepeat: 'no-repeat',
+              WebkitMaskPosition: 'center',
+              maskPosition: 'center',
+            }}
+          >
+            {tiledWords.map((w, i) => (
+              <span
+                key={i}
+                className={`text-[8px] md:text-[10px] leading-none font-mono font-bold uppercase tracking-tight whitespace-nowrap ${
+                  i % 5 === 0 ? 'text-amber-100' : i % 3 === 0 ? 'text-amber-500' : 'text-amber-300'
+                }`}
+              >
+                {w}
+              </span>
+            ))}
+          </div>
+
+          {/* Contorno decorativo (solo en modo Silueta Iluminada) para confirmar la forma */}
+          {visualMode === 'silhouette' && (
+            <svg
+              viewBox={ELEPHANT_VIEWBOX}
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              fill="none"
+              stroke="#fbbf24"
+              strokeOpacity="0.9"
+              strokeWidth="3"
+            >
+              <rect x="365" y="50" width="32" height="95" />
+              <polygon points="381,8 358,50 404,50" />
+              <ellipse cx="380" cy="260" rx="140" ry="85" />
+              <path d="M230,150 C300,128 322,212 280,262 C250,292 208,272 200,232 C195,192 200,162 230,150 Z" />
+              <circle cx="190" cy="230" r="70" />
+              <path d="M120,235 Q80,285 63,335 Q52,368 78,382" strokeWidth="4" />
+              <path d="M140,278 Q118,302 92,296" strokeWidth="2.5" />
+              <path d="M515,245 Q545,265 535,300" strokeWidth="2" />
+              <path d="M270,340 L255,460 L268,460 L250,600 L266,600 L255,730" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M310,340 L322,465 L308,465 L326,605 L310,605 L322,730" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M430,340 L415,465 L428,465 L412,605 L426,605 L415,730" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M470,340 L485,460 L470,460 L488,600 L472,600 L485,730" strokeWidth="2" strokeLinejoin="round" />
             </svg>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* ESTRUCTURA DEL CALIGRAMA DEL ELEFANTE */}
-        <div className="relative z-10 max-w-2xl mx-auto flex flex-col items-center select-none font-['Cinzel']">
-
-          {/* PARTE 1: EL OBELISCO CELESTE DE BERNINI */}
-          <div 
-            onMouseEnter={() => setHoveredPart('obelisk')}
-            onMouseLeave={() => setHoveredPart(null)}
-            className={`flex flex-col items-center gap-1.5 transition-all duration-300 pb-2 ${
-              hoveredPart === 'obelisk' ? 'scale-105 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)]' : ''
-            }`}
-          >
-            <div className="text-amber-400 text-sm md:text-base animate-bounce">▲</div>
-            
-            {/* Cúspide piramidal */}
-            <span className="text-[10px] md:text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40 hover:bg-amber-400 hover:text-black transition-colors cursor-default tracking-widest">
-              [ {distributedParts.obeliskApex} ]
-            </span>
-
-            {/* Fuste medio del obelisco */}
-            <div className="flex gap-2 text-[10px] md:text-xs text-amber-300/90 tracking-wider">
-              {distributedParts.obeliskMid.map((w, i) => (
-                <span key={i} className="px-2 py-0.5 rounded bg-neutral-900/80 border border-amber-600/30 hover:border-amber-400 hover:text-white transition-colors">
-                  [ {w} ]
-                </span>
-              ))}
-            </div>
-
-            {/* Base ancha del obelisco */}
-            <div className="flex gap-1.5 text-[9px] md:text-[11px] text-amber-200 tracking-wider">
-              {distributedParts.obeliskBase.map((w, i) => (
-                <span key={i} className="px-2 py-0.5 rounded bg-neutral-950 border border-amber-500/30 hover:border-amber-400 hover:text-amber-100 transition-colors">
-                  [ {w} ]
-                </span>
-              ))}
-            </div>
-
-            <div className="w-48 md:w-64 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent my-1"></div>
-            
-            {/* Montura y manta ceremonial sobre el lomo */}
-            <div className="flex gap-2 text-[10px] md:text-xs font-semibold text-amber-400 tracking-widest">
-              {distributedParts.saddle.map((w, i) => (
-                <span key={i} className="px-3 py-1 rounded bg-amber-600/30 border border-amber-500/50 hover:bg-amber-500 hover:text-black transition-colors">
-                  ❖ {w} ❖
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* PARTE 2: CABEZA, TROMPA, COLMILLOS Y LOMO SUPERIOR */}
-          <div 
-            onMouseEnter={() => setHoveredPart('body')}
-            onMouseLeave={() => setHoveredPart(null)}
-            className={`w-full max-w-xl transition-all duration-300 py-3 ${
-              hoveredPart === 'body' ? 'scale-[1.02] drop-shadow-[0_0_20px_rgba(217,119,6,0.6)]' : ''
-            }`}
-          >
-            {/* Fila superior: Trompa alzada a la izquierda y grupa del elefante a la derecha */}
-            <div className="flex items-center justify-between text-[10px] md:text-xs mb-2">
-              {/* Trompa erguida apuntando al cielo */}
-              <div className="flex flex-col items-start gap-1">
-                <span className="text-amber-400 text-xs font-bold pl-2">╭─── [ {distributedParts.trunkTip} ] ⤴</span>
-                <span className="text-amber-500/80 text-[10px] pl-6">│ [ {distributedParts.trunkMid} ]</span>
-              </div>
-              
-              {/* Lomo y grupa del lomo posterior */}
-              <div className="flex gap-1.5 text-[10px] md:text-xs">
-                {distributedParts.torsoUpper.map((w, i) => (
-                  <span key={i} className="px-2.5 py-1 rounded bg-neutral-900/90 border border-amber-600/40 text-amber-300 font-bold hover:bg-amber-600 hover:text-black transition-colors">
-                    [ {w} ]
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Fila central: Cabeza, grandes orejas, colmillos y torso denso */}
-            <div className="flex items-center justify-between gap-2 text-[9px] md:text-[11px] mb-2">
-              {/* Colmillos curvados y cabeza */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-amber-100 font-serif italic text-xs">« {distributedParts.tusks} »</span>
-                {distributedParts.head.map((w, i) => (
-                  <span key={i} className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
-                    [ {w} ]
-                  </span>
-                ))}
-              </div>
-
-              {/* Orejas y vientre inferior */}
-              <div className="flex gap-1.5">
-                {distributedParts.ears.map((w, i) => (
-                  <span key={i} className="px-2 py-0.5 rounded bg-neutral-900 border border-amber-700/50 text-amber-400/90">
-                    [ {w} ]
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Fila inferior del cuerpo / masa abdominal */}
-            <div className="flex justify-center gap-2 text-[9px] md:text-xs">
-              {distributedParts.torsoLower.map((w, i) => (
-                <span key={i} className="px-3 py-1 rounded bg-black/80 border border-amber-600/30 text-amber-200 tracking-wider hover:border-amber-400 hover:text-white transition-colors">
-                  [ {w} ]
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* LÍNEA GUÍA DE ANCLAJE ANTES DE LAS PATAS */}
-          <div className="w-3/4 max-w-md h-[1px] bg-gradient-to-r from-transparent via-amber-600/60 to-transparent my-1"></div>
-
-          {/* PARTE 3: LAS 4 PATAS ZANCUDAS INFINITAS (CARACTERÍSTICA CULMINANTE DE DALÍ) */}
-          <div 
-            onMouseEnter={() => setHoveredPart('legs')}
-            onMouseLeave={() => setHoveredPart(null)}
-            className={`w-full max-w-xl grid grid-cols-4 gap-2 md:gap-4 pt-2 transition-all duration-300 ${
-              hoveredPart === 'legs' ? 'drop-shadow-[0_0_15px_rgba(251,191,36,0.6)]' : ''
-            }`}
-          >
-            {/* PATA 1: Delantera Izquierda (Extendida hacia adelante) */}
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-[9px] text-amber-500 font-mono tracking-tighter uppercase font-bold">Pata I</span>
-              <div className="w-[1px] h-3 bg-amber-600/50"></div>
-              {distributedParts.legFront1.map((w, idx) => (
-                <div key={idx} className="flex flex-col items-center">
-                  <span className="text-[8px] md:text-[10px] writing-mode-vertical text-amber-300/90 hover:text-white hover:bg-amber-600 px-1 py-1 rounded border border-amber-900/40 bg-black/60 transition-colors tracking-widest cursor-default max-w-[80px] truncate text-center">
-                    {w}
-                  </span>
-                  {idx < distributedParts.legFront1.length - 1 && (
-                    <div className="my-1 text-[8px] text-amber-400">✦</div>
-                  )}
-                </div>
-              ))}
-              <div className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,1)]"></div>
-              <span className="text-[8px] text-gray-500 font-mono">⏊</span>
-            </div>
-
-            {/* PATA 2: Delantera Derecha (Interior) */}
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-[9px] text-amber-500 font-mono tracking-tighter uppercase font-bold">Pata II</span>
-              <div className="w-[1px] h-3 bg-amber-600/50"></div>
-              {distributedParts.legFront2.map((w, idx) => (
-                <div key={idx} className="flex flex-col items-center">
-                  <span className="text-[8px] md:text-[10px] writing-mode-vertical text-amber-400/90 hover:text-white hover:bg-amber-600 px-1 py-1 rounded border border-amber-900/40 bg-black/60 transition-colors tracking-widest cursor-default max-w-[80px] truncate text-center">
-                    {w}
-                  </span>
-                  {idx < distributedParts.legFront2.length - 1 && (
-                    <div className="my-1 text-[8px] text-amber-500">⬦</div>
-                  )}
-                </div>
-              ))}
-              <div className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,1)]"></div>
-              <span className="text-[8px] text-gray-500 font-mono">⏊</span>
-            </div>
-
-            {/* PATA 3: Trasera Izquierda (Interior) */}
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-[9px] text-amber-500 font-mono tracking-tighter uppercase font-bold">Pata III</span>
-              <div className="w-[1px] h-3 bg-amber-600/50"></div>
-              {distributedParts.legBack1.map((w, idx) => (
-                <div key={idx} className="flex flex-col items-center">
-                  <span className="text-[8px] md:text-[10px] writing-mode-vertical text-amber-400/90 hover:text-white hover:bg-amber-600 px-1 py-1 rounded border border-amber-900/40 bg-black/60 transition-colors tracking-widest cursor-default max-w-[80px] truncate text-center">
-                    {w}
-                  </span>
-                  {idx < distributedParts.legBack1.length - 1 && (
-                    <div className="my-1 text-[8px] text-amber-500">⬦</div>
-                  )}
-                </div>
-              ))}
-              <div className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,1)]"></div>
-              <span className="text-[8px] text-gray-500 font-mono">⏊</span>
-            </div>
-
-            {/* PATA 4: Trasera Derecha (Extendida hacia atrás) */}
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-[9px] text-amber-500 font-mono tracking-tighter uppercase font-bold">Pata IV</span>
-              <div className="w-[1px] h-3 bg-amber-600/50"></div>
-              {distributedParts.legBack2.map((w, idx) => (
-                <div key={idx} className="flex flex-col items-center">
-                  <span className="text-[8px] md:text-[10px] writing-mode-vertical text-amber-300/90 hover:text-white hover:bg-amber-600 px-1 py-1 rounded border border-amber-900/40 bg-black/60 transition-colors tracking-widest cursor-default max-w-[80px] truncate text-center">
-                    {w}
-                  </span>
-                  {idx < distributedParts.legBack2.length - 1 && (
-                    <div className="my-1 text-[8px] text-amber-400">✦</div>
-                  )}
-                </div>
-              ))}
-              <div className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,1)]"></div>
-              <span className="text-[8px] text-gray-500 font-mono">⏊</span>
-            </div>
-          </div>
-
-          {/* LÍNEA DE SUELO / HORIZONTE SURREALISTA */}
-          <div className="w-full mt-4 pt-2 border-t border-amber-600/40 flex justify-between items-center text-[10px] font-mono text-amber-500/70">
-            <span>◄ Desierto de Port Lligat</span>
-            <span className="text-amber-400 tracking-widest text-[9px] uppercase font-['Cinzel']">
-              — Plano Terrenal vs. Altura Onírica —
-            </span>
-            <span>Horizonte Infinito ►</span>
-          </div>
+        {/* LÍNEA DE SUELO / HORIZONTE SURREALISTA */}
+        <div className="relative z-10 w-full max-w-xl mx-auto mt-4 pt-2 border-t border-amber-600/40 flex justify-between items-center text-[10px] font-mono text-amber-500/70">
+          <span>◄ Desierto de Port Lligat</span>
+          <span className="text-amber-400 tracking-widest text-[9px] uppercase font-['Cinzel']">
+            — Plano Terrenal vs. Altura Onírica —
+          </span>
+          <span>Horizonte Infinito ►</span>
         </div>
       </div>
 
